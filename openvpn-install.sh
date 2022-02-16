@@ -325,7 +325,8 @@ function installQuestions() {
 	echo "   11) AdGuard DNS (Anycast: worldwide)"
 	echo "   12) NextDNS (Anycast: worldwide)"
 	echo "   13) Custom"
-	until [[ $DNS =~ ^[0-9]+$ ]] && [ "$DNS" -ge 1 ] && [ "$DNS" -le 13 ]; do
+	echo "   14) No setting"
+	until [[ $DNS =~ ^[0-9]+$ ]] && [ "$DNS" -ge 1 ] && [ "$DNS" -le 14 ]; do
 		read -rp "DNS [1-12]: " -e -i 11 DNS
 		if [[ $DNS == 2 ]] && [[ -e /etc/unbound/unbound.conf ]]; then
 			echo ""
@@ -354,6 +355,11 @@ function installQuestions() {
 				fi
 			done
 		fi
+	done
+	echo ""
+	echo "Do you want to enable default gateway?"
+	until [[ $DEFAULT_GATEWAY =~ (y|n) ]]; do
+		read -rp"Enable default gateway? [y/n]: " -e -i n DEFAULT_GATEWAY
 	done
 	echo ""
 	echo "Do you want to use compression? It is not recommended since the VORACLE attack makes use of it."
@@ -619,6 +625,7 @@ function installOpenVPN() {
 		PORT_CHOICE=${PORT_CHOICE:-1}
 		PROTOCOL_CHOICE=${PROTOCOL_CHOICE:-1}
 		DNS=${DNS:-1}
+		DEFAULT_GATEWAY=${DEFAULT_GATEWAY:-n}
 		COMPRESSION_ENABLED=${COMPRESSION_ENABLED:-n}
 		CUSTOMIZE_ENC=${CUSTOMIZE_ENC:-n}
 		CLIENT=${CLIENT:-client}
@@ -853,16 +860,24 @@ ifconfig-pool-persist ipp.txt" >>/etc/openvpn/server.conf
 			echo "push \"dhcp-option DNS $DNS2\"" >>/etc/openvpn/server.conf
 		fi
 		;;
-	esac
-	echo 'push "redirect-gateway def1 bypass-dhcp"' >>/etc/openvpn/server.conf
 
+	#Not Setting DNS
+	14) ;;
+
+	esac
+
+	if [[ $DEFAULT_GATEWAY == 'y' ]]; then
+		echo 'push "redirect-gateway def1 bypass-dhcp"' >>/etc/openvpn/server.conf
+	fi
 	# IPv6 network settings if needed
 	if [[ $IPV6_SUPPORT == 'y' ]]; then
 		echo 'server-ipv6 fd42:42:42:42::/112
 tun-ipv6
 push tun-ipv6
-push "route-ipv6 2000::/3"
-push "redirect-gateway ipv6"' >>/etc/openvpn/server.conf
+push "route-ipv6 2000::/3"' >>/etc/openvpn/server.conf
+		if [[ $DEFAULT_GATEWAY == 'y' ]]; then
+			echo 'push "redirect-gateway ipv6"' >>/etc/openvpn/server.conf
+		fi
 	fi
 
 	if [[ $COMPRESSION_ENABLED == "y" ]]; then
